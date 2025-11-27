@@ -101,19 +101,22 @@ func (tl *TCPListener) handleConnection(conn net.Conn) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := conn.Read(buf)
+
+		// Process any data received, even if there's also an error
+		if n > 0 {
+			// Log the received data
+			if logErr := tl.logger.LogData(sourceIP, sourcePort, "TCP", buf[:n]); logErr != nil {
+				fmt.Printf("Failed to log TCP data: %v\n", logErr)
+			}
+		}
+
+		// Check for errors after processing data
 		if err != nil {
 			// Only log unexpected errors (not EOF or connection reset)
 			if err != io.EOF && !isExpectedNetworkError(err) {
 				fmt.Printf("TCP read error from %s:%d: %v\n", sourceIP, sourcePort, err)
 			}
 			break
-		}
-
-		if n > 0 {
-			// Log the received data
-			if err := tl.logger.LogData(sourceIP, sourcePort, "TCP", buf[:n]); err != nil {
-				fmt.Printf("Failed to log TCP data: %v\n", err)
-			}
 		}
 	}
 }
@@ -213,19 +216,22 @@ func (tl *TLSListener) handleConnection(conn net.Conn) {
 	buf := make([]byte, 4096)
 	for {
 		n, err := conn.Read(buf)
+
+		// Process any data received, even if there's also an error
+		if n > 0 {
+			// Log the received data
+			if logErr := tl.logger.LogData(sourceIP, sourcePort, "TLS", buf[:n]); logErr != nil {
+				fmt.Printf("Failed to log TLS data: %v\n", logErr)
+			}
+		}
+
+		// Check for errors after processing data
 		if err != nil {
 			// Only log unexpected errors (not EOF or connection reset)
 			if err != io.EOF && !isExpectedNetworkError(err) {
 				fmt.Printf("TLS read error from %s:%d: %v\n", sourceIP, sourcePort, err)
 			}
 			break
-		}
-
-		if n > 0 {
-			// Log the received data
-			if err := tl.logger.LogData(sourceIP, sourcePort, "TLS", buf[:n]); err != nil {
-				fmt.Printf("Failed to log TLS data: %v\n", err)
-			}
 		}
 	}
 }
