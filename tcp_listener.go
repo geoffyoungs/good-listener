@@ -8,6 +8,31 @@ import (
 	"strings"
 )
 
+// isExpectedNetworkError checks if an error is an expected network condition
+// that shouldn't be logged (connection reset, broken pipe, etc.)
+func isExpectedNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+	// Common expected network errors
+	expectedErrors := []string{
+		"connection reset by peer",
+		"broken pipe",
+		"connection timed out",
+		"use of closed network connection",
+	}
+
+	for _, expected := range expectedErrors {
+		if strings.Contains(errStr, expected) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // TCPListener listens for TCP connections and logs traffic
 type TCPListener struct {
 	config   ListenerConfig
@@ -77,7 +102,8 @@ func (tl *TCPListener) handleConnection(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err != io.EOF {
+			// Only log unexpected errors (not EOF or connection reset)
+			if err != io.EOF && !isExpectedNetworkError(err) {
 				fmt.Printf("TCP read error from %s:%d: %v\n", sourceIP, sourcePort, err)
 			}
 			break
@@ -188,7 +214,8 @@ func (tl *TLSListener) handleConnection(conn net.Conn) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
-			if err != io.EOF {
+			// Only log unexpected errors (not EOF or connection reset)
+			if err != io.EOF && !isExpectedNetworkError(err) {
 				fmt.Printf("TLS read error from %s:%d: %v\n", sourceIP, sourcePort, err)
 			}
 			break
