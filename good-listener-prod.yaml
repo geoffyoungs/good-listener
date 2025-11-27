@@ -1,0 +1,6 @@
+listeners:
+  # Production TCP listener on port 80887
+  - port: 80887
+    protocol: TCP
+    log_file: /var/log/good-listener/tcp_80887.log
+    log_level: DEBUG

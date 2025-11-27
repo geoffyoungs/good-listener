@@ -1,0 +1,27 @@
+listeners:
+  # TCP listener example - logs HTTP traffic on port 8080
+  - port: 18080
+    protocol: TCP
+    log_file: ./logs/tcp_8080.log
+    log_level: DEBUG
+
+  # UDP listener example - logs DNS-like traffic on port 5353
+  - port: 15353
+    protocol: UDP
+    log_file: ./logs/udp_5353.log
+    log_level: DEBUG
+
+  # Another TCP listener with DATA-only logging
+  - port: 19000
+    protocol: TCP
+    log_file: ./logs/tcp_9000.log
+    log_level: DATA
+
+  # TLS listener example (requires certificate and key files)
+  # Uncomment and configure with your certificate files to use
+  # - port: 8443
+  #   protocol: TLS
+  #   log_file: ./logs/tls_8443.log
+  #   log_level: DEBUG
+  #   tls_cert_file: ./certs/server.crt
+  #   tls_key_file: ./certs/server.key

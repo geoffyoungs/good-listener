@@ -1,0 +1,31 @@
+# Binary
+good-listener
+good-listener-linux-*
+good-listener-darwin-*
+good-listener-windows-*
+network-logger
+
+# Log files and directories
+logs/
+*.log
+*.log.*
+
+# TLS certificates and keys (for security)
+certs/
+*.crt
+*.key
+*.pem
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/

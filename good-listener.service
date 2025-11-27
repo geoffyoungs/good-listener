@@ -1,0 +1,25 @@
+[Unit]
+Description=Good Listener - Network Traffic Logger
+After=network.target
+Documentation=https://github.com/geoffyoungs/good-listener
+
+[Service]
+Type=simple
+User=good-listener
+Group=good-listener
+ExecStart=/usr/local/bin/good-listener -config /etc/good-listener.yaml
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/good-listener
+
+# Allow binding to privileged ports (below 1024)
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
