@@ -43,7 +43,7 @@ type TCPListener struct {
 
 // NewTCPListener creates a new TCP listener
 func NewTCPListener(config ListenerConfig) (*TCPListener, error) {
-	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel)
+	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel, config.BinaryEncoding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -113,8 +113,8 @@ func (tl *TCPListener) handleConnection(conn net.Conn) {
 		// Check for errors after processing data
 		if err != nil {
 			// Only log unexpected errors (not EOF or connection reset)
-			if err != io.EOF && !isExpectedNetworkError(err) {
-				fmt.Printf("TCP read error from %s:%d: %v\n", sourceIP, sourcePort, err)
+			if err != io.EOF { // && !isExpectedNetworkError(err) {
+				fmt.Printf("TCP read error from %s:%d: %v (read %d)\n", sourceIP, sourcePort, err, n)
 			}
 			break
 		}
@@ -143,7 +143,7 @@ type TLSListener struct {
 
 // NewTLSListener creates a new TLS listener
 func NewTLSListener(config ListenerConfig) (*TLSListener, error) {
-	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel)
+	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel, config.BinaryEncoding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}

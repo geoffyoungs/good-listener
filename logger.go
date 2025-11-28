@@ -32,6 +32,7 @@ type LogEntry struct {
 type RotatingLogger struct {
 	filename       string
 	logLevel       LogLevel
+	binaryEncoding BinaryEncoding
 	file           *os.File
 	currentSize    int64
 	lastRotation   time.Time
@@ -41,12 +42,13 @@ type RotatingLogger struct {
 }
 
 // NewRotatingLogger creates a new rotating logger
-func NewRotatingLogger(filename string, logLevel LogLevel) (*RotatingLogger, error) {
+func NewRotatingLogger(filename string, logLevel LogLevel, binaryEncoding BinaryEncoding) (*RotatingLogger, error) {
 	logger := &RotatingLogger{
-		filename:     filename,
-		logLevel:     logLevel,
-		lastRotation: time.Now(),
-		stopChan:     make(chan struct{}),
+		filename:       filename,
+		logLevel:       logLevel,
+		binaryEncoding: binaryEncoding,
+		lastRotation:   time.Now(),
+		stopChan:       make(chan struct{}),
 	}
 
 	// Open or create the log file (append mode on restart)
@@ -153,12 +155,12 @@ func (rl *RotatingLogger) rotate() error {
 }
 
 // encodePayload determines the appropriate encoding for the payload and returns
-// the encoded string and encoding type ("ascii", "utf8", or "base64")
-func encodePayload(payload []byte) (string, string) {
+// the encoded string and encoding type ("ascii", "utf8", "base64", or "hex")
+func encodePayload(payload []byte, binaryEncoding BinaryEncoding) (string, string) {
 	// Check if it's valid UTF-8
 	if !utf8.Valid(payload) {
-		// Not valid UTF-8, use base64
-		return base64.StdEncoding.EncodeToString(payload), "base64"
+		// Not valid UTF-8, use configured binary encoding
+		return encodeBinary(payload, binaryEncoding)
 	}
 
 	// Check if all characters are ASCII (and printable or common whitespace)
@@ -170,8 +172,8 @@ func encodePayload(payload []byte) (string, string) {
 		}
 		// Allow printable ASCII (32-126) and common whitespace (9=tab, 10=LF, 13=CR)
 		if b < 32 && b != 9 && b != 10 && b != 13 {
-			// Contains non-printable control characters, use base64
-			return base64.StdEncoding.EncodeToString(payload), "base64"
+			// Contains non-printable control characters, use configured binary encoding
+			return encodeBinary(payload, binaryEncoding)
 		}
 	}
 
@@ -181,6 +183,35 @@ func encodePayload(payload []byte) (string, string) {
 
 	// Valid UTF-8 with non-ASCII characters
 	return string(payload), "utf8"
+}
+
+// encodeBinary encodes binary data according to the specified encoding preference
+func encodeBinary(payload []byte, binaryEncoding BinaryEncoding) (string, string) {
+	if binaryEncoding == BinaryEncodingHex {
+		return encodeHex(payload), "hex"
+	}
+	return base64.StdEncoding.EncodeToString(payload), "base64"
+}
+
+// encodeHex encodes binary data as hexadecimal (like hexdump, without offsets)
+func encodeHex(payload []byte) string {
+	if len(payload) == 0 {
+		return ""
+	}
+
+	// Format: "00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f"
+	// Similar to hexdump but without offset and ASCII columns
+	hexBytes := make([]byte, len(payload)*3-1) // 2 chars per byte + space, minus last space
+
+	for i, b := range payload {
+		hexBytes[i*3] = "0123456789abcdef"[b>>4]
+		hexBytes[i*3+1] = "0123456789abcdef"[b&0x0f]
+		if i < len(payload)-1 {
+			hexBytes[i*3+2] = ' '
+		}
+	}
+
+	return string(hexBytes)
 }
 
 // LogData logs data based on the configured log level
@@ -196,7 +227,7 @@ func (rl *RotatingLogger) LogData(sourceIP string, sourcePort int, protocol stri
 		logData = append(payload, '\n')
 	} else {
 		// DEBUG mode: log JSON with metadata
-		encodedPayload, encoding := encodePayload(payload)
+		encodedPayload, encoding := encodePayload(payload, rl.binaryEncoding)
 		entry := LogEntry{
 			Timestamp:  time.Now().Format(time.RFC3339),
 			SourceIP:   sourceIP,

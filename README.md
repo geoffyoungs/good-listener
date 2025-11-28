@@ -33,23 +33,25 @@ Create a `config.yaml` file with your listener configurations:
 
 ```yaml
 listeners:
-  # TCP listener
+  # TCP listener with default base64 encoding
   - port: 8080
     protocol: TCP
     log_file: ./logs/tcp_8080.log
     log_level: DEBUG
 
-  # UDP listener
+  # UDP listener with hex encoding for binary data
   - port: 5353
     protocol: UDP
     log_file: ./logs/udp_5353.log
-    log_level: DATA
+    log_level: DEBUG
+    binary_encoding: hex
 
   # TLS listener
   - port: 8443
     protocol: TLS
     log_file: ./logs/tls_8443.log
     log_level: DEBUG
+    binary_encoding: base64
     tls_cert_file: ./certs/server.crt
     tls_key_file: ./certs/server.key
 ```
@@ -62,6 +64,7 @@ listeners:
 | `protocol` | string | Yes | Protocol type: `TCP`, `UDP`, or `TLS` |
 | `log_file` | string | Yes | Path to the log file |
 | `log_level` | string | Yes | Logging detail: `DATA` or `DEBUG` |
+| `binary_encoding` | string | No | Binary encoding: `base64` (default) or `hex` |
 | `tls_cert_file` | string | TLS only | Path to TLS certificate file |
 | `tls_key_file` | string | TLS only | Path to TLS private key file |
 
@@ -82,12 +85,29 @@ Host: example.com
 The `encoding` field indicates how the payload is encoded:
 - **`ascii`**: Pure ASCII text (all bytes < 128, printable characters)
 - **`utf8`**: Valid UTF-8 with non-ASCII characters (e.g., emoji, international characters)
-- **`base64`**: Binary data or non-printable characters, base64-encoded for safe JSON representation
+- **`base64`**: Binary data encoded as base64 (compact, standard encoding)
+- **`hex`**: Binary data encoded as hexadecimal octets (human-readable, like hexdump)
 
-Example with binary data:
+#### Binary Encoding Options
+
+You can configure how binary data is encoded using the `binary_encoding` field:
+
+**Base64 encoding** (default):
 ```json
 {"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"AAECAwQFBgcICQ==","payload_len":10,"encoding":"base64"}
 ```
+
+**Hex encoding** (hexdump-style, without offsets):
+```json
+{"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"00 01 02 03 04 05 06 07 08 09","payload_len":10,"encoding":"hex"}
+```
+
+Hex encoding is useful for:
+- Manual inspection of binary protocols
+- Debugging byte-by-byte communication
+- Human-readable representation of binary data
+
+Base64 encoding is more compact and better for automated processing.
 
 ### ASTERIX Message Decoding
 

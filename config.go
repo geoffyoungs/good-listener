@@ -24,12 +24,21 @@ const (
 	ProtocolTLS ProtocolType = "TLS"
 )
 
+// BinaryEncoding represents how binary data is encoded in logs
+type BinaryEncoding string
+
+const (
+	BinaryEncodingBase64 BinaryEncoding = "base64"
+	BinaryEncodingHex    BinaryEncoding = "hex"
+)
+
 // ListenerConfig represents configuration for a single listener
 type ListenerConfig struct {
-	Port     int          `yaml:"port"`
-	Protocol ProtocolType `yaml:"protocol"`
-	LogFile  string       `yaml:"log_file"`
-	LogLevel LogLevel     `yaml:"log_level"`
+	Port           int            `yaml:"port"`
+	Protocol       ProtocolType   `yaml:"protocol"`
+	LogFile        string         `yaml:"log_file"`
+	LogLevel       LogLevel       `yaml:"log_level"`
+	BinaryEncoding BinaryEncoding `yaml:"binary_encoding,omitempty"` // "base64" or "hex", defaults to "base64"
 	// TLS-specific configuration
 	TLSCertFile string `yaml:"tls_cert_file,omitempty"`
 	TLSKeyFile  string `yaml:"tls_key_file,omitempty"`
@@ -81,6 +90,13 @@ func (c *Config) Validate() error {
 
 		if listener.LogLevel != LogLevelData && listener.LogLevel != LogLevelDebug {
 			return fmt.Errorf("listener %d: invalid log_level %s (must be DATA or DEBUG)", i, listener.LogLevel)
+		}
+
+		// Set default binary encoding if not specified
+		if listener.BinaryEncoding == "" {
+			c.Listeners[i].BinaryEncoding = BinaryEncodingBase64
+		} else if listener.BinaryEncoding != BinaryEncodingBase64 && listener.BinaryEncoding != BinaryEncodingHex {
+			return fmt.Errorf("listener %d: invalid binary_encoding %s (must be base64 or hex)", i, listener.BinaryEncoding)
 		}
 
 		if listener.Protocol == ProtocolTLS {

@@ -15,7 +15,7 @@ type UDPListener struct {
 
 // NewUDPListener creates a new UDP listener
 func NewUDPListener(config ListenerConfig) (*UDPListener, error) {
-	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel)
+	logger, err := NewRotatingLogger(config.LogFile, config.LogLevel, config.BinaryEncoding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
