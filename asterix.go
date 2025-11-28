@@ -111,7 +111,8 @@ func decodeDataBlock(data []byte, category int) (map[string]interface{}, int, er
 	dataItems := make(map[string]interface{})
 	frn := 1 // Field Reference Number
 
-	for byteIdx := 0; byteIdx < len(fspec)-1; byteIdx++ {
+	// Process ALL FSPEC bytes (each byte has 7 data item bits + 1 FX bit)
+	for byteIdx := 0; byteIdx < len(fspec); byteIdx++ {
 		fspecByte := fspec[byteIdx]
 		for bitIdx := 7; bitIdx >= 1; bitIdx-- { // bits 7-1 (bit 0 is FX - extension bit)
 			if fspecByte&(1<<bitIdx) != 0 {
@@ -287,7 +288,7 @@ func decodeCAT34Item(data []byte, frn int) (string, interface{}, int) {
 	return fmt.Sprintf("I034_%03d", frn), base64.StdEncoding.EncodeToString(data[:size]), size
 }
 
-// decodeCAT21Item decodes CAT 021 data items
+// decodeCAT21Item decodes CAT 021 data items (ADS-B Target Reports)
 func decodeCAT21Item(data []byte, frn int) (string, interface{}, int) {
 	switch frn {
 	case 1: // I021/010 - Data Source Identification
@@ -297,7 +298,7 @@ func decodeCAT21Item(data []byte, frn int) (string, interface{}, int) {
 				"sic": int(data[1]),
 			}, 2
 		}
-	case 3: // I021/040 - Target Report Descriptor
+	case 2: // I021/040 - Target Report Descriptor (variable length)
 		size := 1
 		for i := 0; i < len(data) && i < 10; i++ {
 			if data[i]&0x01 == 0 {
@@ -307,6 +308,80 @@ func decodeCAT21Item(data []byte, frn int) (string, interface{}, int) {
 		}
 		if size <= len(data) {
 			return "target_report_descriptor", base64.StdEncoding.EncodeToString(data[:size]), size
+		}
+	case 3: // I021/161 - Track Number
+		if len(data) >= 2 {
+			trackNum := binary.BigEndian.Uint16(data[0:2]) & 0x0FFF // 12 bits
+			return "track_number", int(trackNum), 2
+		}
+	case 4: // I021/015 - Service Identification
+		if len(data) >= 1 {
+			return "service_id", int(data[0]), 1
+		}
+	case 5: // I021/071 - Time of Applicability for Position
+		if len(data) >= 3 {
+			toa := (uint32(data[0]) << 16) | (uint32(data[1]) << 8) | uint32(data[2])
+			return "time_of_applicability_position", map[string]interface{}{
+				"raw":     toa,
+				"seconds": float64(toa) / 128.0,
+			}, 3
+		}
+	case 6: // I021/130 - Position in WGS-84 Coordinates
+		if len(data) >= 8 {
+			lat := int32(binary.BigEndian.Uint32(data[0:4]))
+			lon := int32(binary.BigEndian.Uint32(data[4:8]))
+			return "position_wgs84", map[string]interface{}{
+				"latitude":  float64(lat) * (180.0 / math.Pow(2, 23)),
+				"longitude": float64(lon) * (180.0 / math.Pow(2, 23)),
+			}, 8
+		}
+	case 7: // I021/131 - High-Resolution Position in WGS-84
+		if len(data) >= 8 {
+			lat := int32(binary.BigEndian.Uint32(data[0:4]))
+			lon := int32(binary.BigEndian.Uint32(data[4:8]))
+			return "position_wgs84_high_res", map[string]interface{}{
+				"latitude":  float64(lat) * (180.0 / math.Pow(2, 30)),
+				"longitude": float64(lon) * (180.0 / math.Pow(2, 30)),
+			}, 8
+		}
+	case 11: // I021/080 - Target Address (24-bit ICAO address) - in 2nd FSPEC byte
+		if len(data) >= 3 {
+			addr := (uint32(data[0]) << 16) | (uint32(data[1]) << 8) | uint32(data[2])
+			return "target_address", fmt.Sprintf("%06X", addr), 3
+		}
+	case 16: // I021/146 - Selected Altitude (appears later in FSPEC)
+		if len(data) >= 2 {
+			alt := int16(binary.BigEndian.Uint16(data[0:2]))
+			return "selected_altitude", map[string]interface{}{
+				"source":   (alt >> 15) & 0x01,
+				"altitude": float64(alt&0x7FFF) * 25.0, // feet
+			}, 2
+		}
+	case 17: // I021/148 - Final State Selected Altitude
+		if len(data) >= 2 {
+			alt := int16(binary.BigEndian.Uint16(data[0:2]))
+			return "final_state_selected_altitude", map[string]interface{}{
+				"mv":       (alt >> 15) & 0x01,
+				"ah":       (alt >> 14) & 0x01,
+				"am":       (alt >> 13) & 0x01,
+				"altitude": float64(alt&0x1FFF) * 25.0, // feet
+			}, 2
+		}
+	case 20: // I021/110 - Trajectory Intent (appears later, variable)
+		// Variable length compound field - complex structure
+		if len(data) >= 1 {
+			// This is complex - just encode as base64 for now
+			estimatedSize := estimateFieldSize(data)
+			return "trajectory_intent", base64.StdEncoding.EncodeToString(data[:estimatedSize]), estimatedSize
+		}
+	case 22: // I021/170 - Target Identification (aircraft ID/callsign)
+		if len(data) >= 6 {
+			callsign := decodeAircraftID(data[:6])
+			return "target_identification", callsign, 6
+		}
+	case 23: // I021/020 - Emitter Category
+		if len(data) >= 1 {
+			return "emitter_category", int(data[0]), 1
 		}
 	}
 
