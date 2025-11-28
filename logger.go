@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -22,6 +24,7 @@ type LogEntry struct {
 	Protocol   string `json:"protocol"`
 	Payload    string `json:"payload"`
 	PayloadLen int    `json:"payload_len"`
+	Encoding   string `json:"encoding"` // "ascii", "utf8", or "base64"
 }
 
 // RotatingLogger handles log writing with automatic rotation
@@ -148,6 +151,37 @@ func (rl *RotatingLogger) rotate() error {
 	return nil
 }
 
+// encodePayload determines the appropriate encoding for the payload and returns
+// the encoded string and encoding type ("ascii", "utf8", or "base64")
+func encodePayload(payload []byte) (string, string) {
+	// Check if it's valid UTF-8
+	if !utf8.Valid(payload) {
+		// Not valid UTF-8, use base64
+		return base64.StdEncoding.EncodeToString(payload), "base64"
+	}
+
+	// Check if all characters are ASCII (and printable or common whitespace)
+	isASCII := true
+	for _, b := range payload {
+		if b >= 128 {
+			isASCII = false
+			break
+		}
+		// Allow printable ASCII (32-126) and common whitespace (9=tab, 10=LF, 13=CR)
+		if b < 32 && b != 9 && b != 10 && b != 13 {
+			// Contains non-printable control characters, use base64
+			return base64.StdEncoding.EncodeToString(payload), "base64"
+		}
+	}
+
+	if isASCII {
+		return string(payload), "ascii"
+	}
+
+	// Valid UTF-8 with non-ASCII characters
+	return string(payload), "utf8"
+}
+
 // LogData logs data based on the configured log level
 func (rl *RotatingLogger) LogData(sourceIP string, sourcePort int, protocol string, payload []byte) error {
 	rl.mu.Lock()
@@ -161,13 +195,15 @@ func (rl *RotatingLogger) LogData(sourceIP string, sourcePort int, protocol stri
 		logData = append(payload, '\n')
 	} else {
 		// DEBUG mode: log JSON with metadata
+		encodedPayload, encoding := encodePayload(payload)
 		entry := LogEntry{
 			Timestamp:  time.Now().Format(time.RFC3339),
 			SourceIP:   sourceIP,
 			SourcePort: sourcePort,
 			Protocol:   protocol,
-			Payload:    string(payload),
+			Payload:    encodedPayload,
 			PayloadLen: len(payload),
+			Encoding:   encoding,
 		}
 		logData, err = json.Marshal(entry)
 		if err != nil {

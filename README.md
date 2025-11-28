@@ -74,7 +74,17 @@ Host: example.com
 
 **DEBUG Mode** - Logs structured JSON with metadata:
 ```json
-{"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"GET / HTTP/1.1\nHost: example.com\n\n","payload_len":32}
+{"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"GET / HTTP/1.1\nHost: example.com\n\n","payload_len":32,"encoding":"ascii"}
+```
+
+The `encoding` field indicates how the payload is encoded:
+- **`ascii`**: Pure ASCII text (all bytes < 128, printable characters)
+- **`utf8`**: Valid UTF-8 with non-ASCII characters (e.g., emoji, international characters)
+- **`base64`**: Binary data or non-printable characters, base64-encoded for safe JSON representation
+
+Example with binary data:
+```json
+{"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"AAECAwQFBgcICQ==","payload_len":10,"encoding":"base64"}
 ```
 
 ## Usage
