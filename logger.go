@@ -18,13 +18,14 @@ const (
 
 // LogEntry represents a debug-level log entry
 type LogEntry struct {
-	Timestamp  string `json:"timestamp"`
-	SourceIP   string `json:"source_ip"`
-	SourcePort int    `json:"source_port"`
-	Protocol   string `json:"protocol"`
-	Payload    string `json:"payload"`
-	PayloadLen int    `json:"payload_len"`
-	Encoding   string `json:"encoding"` // "ascii", "utf8", or "base64"
+	Timestamp  string          `json:"timestamp"`
+	SourceIP   string          `json:"source_ip"`
+	SourcePort int             `json:"source_port"`
+	Protocol   string          `json:"protocol"`
+	Payload    string          `json:"payload"`
+	PayloadLen int             `json:"payload_len"`
+	Encoding   string          `json:"encoding"`          // "ascii", "utf8", or "base64"
+	Asterix    *AsterixMessage `json:"asterix,omitempty"` // Decoded ASTERIX data if detected
 }
 
 // RotatingLogger handles log writing with automatic rotation
@@ -205,6 +206,13 @@ func (rl *RotatingLogger) LogData(sourceIP string, sourcePort int, protocol stri
 			PayloadLen: len(payload),
 			Encoding:   encoding,
 		}
+
+		// Check if payload appears to be ASTERIX and decode it
+		if isAsterixMessage(payload) {
+			asterixData := decodeAsterixMessage(payload)
+			entry.Asterix = asterixData
+		}
+
 		logData, err = json.Marshal(entry)
 		if err != nil {
 			return fmt.Errorf("failed to marshal log entry: %w", err)

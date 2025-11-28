@@ -8,6 +8,8 @@ A lightweight Go-based server that logs network traffic sent to specific ports. 
 - **Configurable Logging Levels**:
   - `DATA`: Logs only the raw payload
   - `DEBUG`: Logs JSON with timestamp, source IP/port, payload, and metadata
+- **ASTERIX Protocol Decoding**: Automatic detection and decoding of ASTERIX messages (CAT 048, 062, 034, 021)
+- **Intelligent Payload Encoding**: Automatic detection of ASCII, UTF-8, or binary data with appropriate encoding
 - **Automatic Log Rotation**:
   - Time-based: Every 24 hours
   - Size-based: When log file exceeds 50MB
@@ -86,6 +88,60 @@ Example with binary data:
 ```json
 {"timestamp":"2025-11-27T10:30:00Z","source_ip":"192.168.1.100","source_port":54321,"protocol":"TCP","payload":"AAECAwQFBgcICQ==","payload_len":10,"encoding":"base64"}
 ```
+
+### ASTERIX Message Decoding
+
+When DEBUG mode is enabled, Good Listener automatically detects and decodes ASTERIX (All Purpose Structured Eurocontrol Surveillance Information Exchange) messages. ASTERIX is a binary protocol used for air traffic control data exchange.
+
+If a payload is detected as ASTERIX, the log entry will include an `asterix` field with decoded message data:
+
+```json
+{
+  "timestamp": "2025-11-27T10:30:00Z",
+  "source_ip": "192.168.1.100",
+  "source_port": 54321,
+  "protocol": "UDP",
+  "payload": "MABCAgEAcgC4AQI=",
+  "payload_len": 14,
+  "encoding": "base64",
+  "asterix": {
+    "category": 48,
+    "length": 14,
+    "data_blocks": [
+      {
+        "fspec": "wA==",
+        "data_items": {
+          "data_source_id": {
+            "sac": 2,
+            "sic": 1
+          },
+          "measured_position_polar": {
+            "rho_nm": 45.5,
+            "theta_deg": 123.45
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+**Supported ASTERIX Categories:**
+- **CAT 048**: Monoradar Target Reports (radar data)
+- **CAT 062**: System Track Data (tracker output)
+- **CAT 034**: Monosensor Surface Movement Data
+- **CAT 021**: ADS-B Target Reports
+
+**Common Decoded Fields:**
+- Data Source Identifier (SAC/SIC)
+- Aircraft positions (polar and WGS-84 coordinates)
+- Mode 3/A codes
+- Flight levels
+- Aircraft identification (callsign)
+- Track numbers
+- Aircraft addresses
+
+Unknown or unsupported data items are included as base64-encoded values for manual inspection.
 
 ## Usage
 
@@ -209,6 +265,7 @@ sudo systemctl restart good-listener
 ├── main.go                    # Main entry point and orchestrator
 ├── config.go                  # Configuration parsing and validation
 ├── logger.go                  # Rotating logger implementation
+├── asterix.go                 # ASTERIX protocol decoder
 ├── tcp_listener.go            # TCP and TLS listener implementations
 ├── udp_listener.go            # UDP listener implementation
 ├── config.yaml                # Example configuration file
